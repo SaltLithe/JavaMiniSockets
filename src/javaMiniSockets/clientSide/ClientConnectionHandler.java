@@ -14,7 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javaMiniSockets.messages.MessageInfoPair;
-import serverSide.ServerCouldNotConnectException;
+import javaMiniSockets.serverSide.ServerCouldNotConnectException;
 
 /**
  * Checks continously for server messages after a fixed delay amd sends them to
