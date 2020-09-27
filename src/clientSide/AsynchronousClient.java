@@ -179,7 +179,7 @@ public class AsynchronousClient {
 		serializedMessage = clientBAOS.toString();
 		clientBAOS.flush();
 		clientBAOS.close();
-		System.out.println("Sending bytes" + serializedMessage.getBytes().length);
+		// System.out.println("Sending bytes" + serializedMessage.getBytes().length);
 
 		executor.execute(() -> {
 			try {
@@ -238,7 +238,7 @@ public class AsynchronousClient {
 			while (ee.hasMoreElements()) {
 				i = (InetAddress) ee.nextElement();
 				addresses.add(i.getHostAddress());
-				System.out.println(i.getHostAddress());
+				// System.out.println(i.getHostAddress());
 			}
 		}
 
@@ -254,7 +254,7 @@ public class AsynchronousClient {
 
 		try {
 
-			System.out.println(ownAddress);
+			// System.out.println(ownAddress);
 			client = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, clientPort));
 
 		} catch (IOException e) {
@@ -328,7 +328,7 @@ public class AsynchronousClient {
 			serializedMessage = clientBAOS.toString();
 			clientBAOS.flush();
 			clientBAOS.close();
-			System.out.println("Sending bytes" + serializedMessage.getBytes().length);
+			// System.out.println("Sending bytes" + serializedMessage.getBytes().length);
 
 			executor.execute(() -> {
 				try {
@@ -370,7 +370,7 @@ public class AsynchronousClient {
 
 		} catch (Exception e) {
 
-			System.out.println("Error writing heartbeat message");
+			// System.out.println("Error writing heartbeat message");
 			e.printStackTrace();
 		} finally {
 			outputbuffer.clear();
@@ -381,7 +381,7 @@ public class AsynchronousClient {
 
 	private void startHeartBeat() {
 
-		System.out.println("sending heartbeat");
+		// System.out.println("sending heartbeat");
 		beater.scheduleAtFixedRate(new Runnable() {
 			@Override
 			public void run() {

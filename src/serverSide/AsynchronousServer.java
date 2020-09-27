@@ -275,7 +275,7 @@ public class AsynchronousServer {
 			while (ee.hasMoreElements()) {
 				i = (InetAddress) ee.nextElement();
 				addresses.add(i.getHostAddress());
-				System.out.println(i.getHostAddress());
+				// System.out.println(i.getHostAddress());
 			}
 		}
 
@@ -290,7 +290,7 @@ public class AsynchronousServer {
 	private void startConnections() {
 		try {
 
-			System.out.println(ownAddress);
+			// System.out.println(ownAddress);
 			server = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, port));
 
 		} catch (IOException e) {
@@ -325,9 +325,12 @@ public class AsynchronousServer {
 					serverHandler.updateHeartBeat(resultado.get().getClient().clientID, incomingMessage.getTimestamp());
 
 				} catch (ClassCastException e) {
-					ConnectionInternalMessage incomingMessage = (ConnectionInternalMessage) resultado.get().getMessage();
-					System.out.println(incomingMessage.getAddress() + " " +incomingMessage.getOpenPort());
-					resultado.get().getClient().connectToClient(incomingMessage.getAddress(), incomingMessage.getOpenPort());
+					ConnectionInternalMessage incomingMessage = (ConnectionInternalMessage) resultado.get()
+							.getMessage();
+					// System.out.println(incomingMessage.getAddress() + " "
+					// +incomingMessage.getOpenPort());
+					resultado.get().getClient().connectToClient(incomingMessage.getAddress(),
+							incomingMessage.getOpenPort());
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
