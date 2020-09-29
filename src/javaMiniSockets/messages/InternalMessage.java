@@ -9,8 +9,11 @@ import java.io.Serializable;
  * @author Carmen Gómez Moreno
  */
 class InternalMessage implements Serializable {
-	public static final long serialVersionUID = 1;
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 8319303565712432972L;
 	Serializable message;
 	long timestamp;
 

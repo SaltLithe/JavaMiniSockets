@@ -3,8 +3,11 @@ package javaMiniSockets.messages;
 import java.io.Serializable;
 
 public class ConnectionInternalMessage implements Serializable {
-	public static final long serialVersionUID = 1;
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -7648446757059596583L;
 	private String address;
 	private int openPort;
 

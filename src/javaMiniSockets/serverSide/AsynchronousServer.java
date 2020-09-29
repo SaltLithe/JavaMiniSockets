@@ -325,12 +325,16 @@ public class AsynchronousServer {
 					serverHandler.updateHeartBeat(resultado.get().getClient().clientID, incomingMessage.getTimestamp());
 
 				} catch (ClassCastException e) {
-					ConnectionInternalMessage incomingMessage = (ConnectionInternalMessage) resultado.get()
-							.getMessage();
-					// System.out.println(incomingMessage.getAddress() + " "
-					// +incomingMessage.getOpenPort());
-					resultado.get().getClient().connectToClient(incomingMessage.getAddress(),
-							incomingMessage.getOpenPort());
+					try {
+						ConnectionInternalMessage incomingMessage = (ConnectionInternalMessage) resultado.get()
+								.getMessage();
+						// System.out.println(incomingMessage.getAddress() + " "
+						// +incomingMessage.getOpenPort());
+						resultado.get().getClient().connectToClient(incomingMessage.getAddress(),
+								incomingMessage.getOpenPort());
+					} catch (ClassCastException e2) {
+
+					}
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
