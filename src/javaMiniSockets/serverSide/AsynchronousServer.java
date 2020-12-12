@@ -19,7 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
-import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
 import javaMiniSockets.messages.ConnectionInternalMessage;
@@ -253,9 +252,7 @@ public class AsynchronousServer {
 		this.ownAddress = ownAddress;
 	}
 
-	public void setAutomaticIP() {
-		ownAddress = UPnP.getLocalIP();
-	}
+
 
 	public ArrayList<String> getAvailableIP() {
 

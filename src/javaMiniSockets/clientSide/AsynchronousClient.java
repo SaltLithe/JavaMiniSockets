@@ -24,7 +24,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
 import javaMiniSockets.messages.ConnectionInternalMessage;
@@ -214,10 +213,6 @@ public class AsynchronousClient {
 
 	public void setOwnAddress(String ownAddress) {
 		this.ownAddress = ownAddress;
-	}
-
-	public void setAutomaticIP() {
-		ownAddress = UPnP.getLocalIP();
 	}
 
 	public ArrayList<String> getAvailableIP() {
