@@ -90,11 +90,18 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	}
 
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	private void stopReading() {
+		if(!fixedReader.isShutdown()) {
+		fixedReader.shutdown();
+		}
+	}
 	/**
 	 * Continously checks if there are messages coming from the server.
 	 */
+	
 	private void readloop() {
 
 		int bytesRead = -1;
@@ -108,7 +115,9 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			e.printStackTrace();
 		} catch (ExecutionException e) {
 
+			
 			messageHandler.onServerDisconnect(serverInfo);
+			stopReading(); 
 
 		}
 

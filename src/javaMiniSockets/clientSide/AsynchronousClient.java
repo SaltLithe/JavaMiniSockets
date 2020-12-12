@@ -149,17 +149,12 @@ public class AsynchronousClient {
 	 * @throws IOException
 	 */
 	public void disconnect() throws NotConnectedYetException, IOException {
-	//	if (serverSocket.isConnected()) {
+		
 			stopHeartBeat();
 			serverSocket.close();
 			messageHandler.onDisconnect();
 
-	//	}
-		/*
-		else {
-			throw new NotConnectedYetException("There is no connection to disconnect from");
-		}
-*/
+
 	}
 
 	/**
@@ -384,7 +379,15 @@ public class AsynchronousClient {
 			heartOutput.close();
 
 		} catch (Exception e) {
-
+			try {
+				disconnect();
+			} catch (NotConnectedYetException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			} 
 			// System.out.println("Error writing heartbeat message");
 			e.printStackTrace();
 		} finally {
