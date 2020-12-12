@@ -19,9 +19,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
+//import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
 import javaMiniSockets.messages.ConnectionInternalMessage;
+import javaMiniSockets.messages.HandShakeInternalMessage;
 import javaMiniSockets.messages.MessageInfoPair;
 
 /**
@@ -39,7 +41,7 @@ import javaMiniSockets.messages.MessageInfoPair;
 public class AsynchronousServer {
 
 	private int port;
-	private int clientport;
+//	private int clientport;
 	private ServerMessageHandler messageHandler;
 	private ThreadPoolExecutor queueReader;
 	private int messageQueue_N;
@@ -64,7 +66,7 @@ public class AsynchronousServer {
 	 */
 
 	public AsynchronousServer(String serverName, ServerMessageHandler messageHandler, int maxClients, int port,
-			int clientport, String ownAddress, int messageQueueSize) {
+			String ownAddress, int messageQueueSize) {
 
 		if (ownAddress != null) {
 			this.ownAddress = ownAddress;
@@ -73,7 +75,7 @@ public class AsynchronousServer {
 
 		this.messageQueue_N = messageQueueSize;
 		this.port = port;
-		this.clientport = clientport;
+		// this.clientport = clientport;
 		this.maxClients = maxClients;
 		this.messageHandler = messageHandler;
 		messageQueue = new ArrayBlockingQueue<MessageInfoPair>(messageQueue_N);
@@ -252,7 +254,10 @@ public class AsynchronousServer {
 		this.ownAddress = ownAddress;
 	}
 
-
+	public void setAutomaticIP() {
+		// ownAddress = UPnP.getLocalIP();
+		ownAddress = "192.168.1.73";
+	}
 
 	public ArrayList<String> getAvailableIP() {
 
@@ -296,7 +301,7 @@ public class AsynchronousServer {
 
 		ClientInfo clientInfo = new ClientInfo();
 		clientInfo.server = server;
-		serverHandler = new ServerConnectionHandler(this, maxClients, clientport, messageHandler);
+		serverHandler = new ServerConnectionHandler(this, maxClients, messageHandler);
 		server.accept(clientInfo, serverHandler);
 
 	}
@@ -316,11 +321,13 @@ public class AsynchronousServer {
 				try {
 					CommonInternalMessage incomingMessage = (CommonInternalMessage) resultado.get().getMessage();
 					// If the message is null it is considered a teartbeat from the client
-					if (incomingMessage.getMessage() != null) {
-						messageHandler.onMessageSent(incomingMessage.getMessage(), resultado.get().getClient());
+					if (incomingMessage != null) {
+						if (incomingMessage.getMessage() != null) {
+							messageHandler.onMessageSent(incomingMessage.getMessage(), resultado.get().getClient());
+						}
+						serverHandler.updateHeartBeat(resultado.get().getClient().clientID,
+								incomingMessage.getTimestamp());
 					}
-					serverHandler.updateHeartBeat(resultado.get().getClient().clientID, incomingMessage.getTimestamp());
-
 				} catch (ClassCastException e) {
 					try {
 						ConnectionInternalMessage incomingMessage = (ConnectionInternalMessage) resultado.get()
@@ -330,6 +337,12 @@ public class AsynchronousServer {
 						resultado.get().getClient().connectToClient(incomingMessage.getAddress(),
 								incomingMessage.getOpenPort());
 					} catch (ClassCastException e2) {
+
+						HandShakeInternalMessage incomingHandshake = (HandShakeInternalMessage) resultado.get()
+								.getMessage();
+						System.out.println("Incoming handshake is  : " + incomingHandshake.address);
+						serverHandler.openBackwardsConnection(resultado.get().getClient().clientID,
+								incomingHandshake.address, incomingHandshake.port);
 
 					}
 				}

@@ -24,9 +24,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+//import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
 import javaMiniSockets.messages.ConnectionInternalMessage;
+import javaMiniSockets.messages.HandShakeInternalMessage;
 import javaMiniSockets.messages.MessageInfoPair;
 
 /**
@@ -68,7 +70,8 @@ public class AsynchronousClient {
 	private long initialDelay = 0;
 	public int heartcount = 0;
 	public int serverPort;
-	public int clientPort;
+	private int attemptCount = 0 ; 
+	private int clientport; 
 
 	/**
 	 * How often a heartbeat message is sent in milliseconds.
@@ -92,7 +95,7 @@ public class AsynchronousClient {
 	 * @param clientPort    : Port this client will be bound to for receiving server
 	 *                      messages. Any dynamic port up to 65,536.
 	 */
-	public AsynchronousClient(String serverAddress, String ownAddress, int serverPort, int clientPort,
+	public AsynchronousClient(String serverAddress, String ownAddress, int serverPort, 
 			ClientMessageHandler handler) {
 
 		if (ownAddress != null) {
@@ -100,7 +103,6 @@ public class AsynchronousClient {
 			this.ownAddress = ownAddress;
 		}
 		this.serverPort = serverPort;
-		this.clientPort = clientPort;
 		messageHandler = handler;
 		this.port = serverPort;
 		this.address = serverAddress;
@@ -147,15 +149,17 @@ public class AsynchronousClient {
 	 * @throws IOException
 	 */
 	public void disconnect() throws NotConnectedYetException, IOException {
-		if (serverSocket.isConnected()) {
+	//	if (serverSocket.isConnected()) {
 			stopHeartBeat();
 			serverSocket.close();
 			messageHandler.onDisconnect();
 
-		} else {
+	//	}
+		/*
+		else {
 			throw new NotConnectedYetException("There is no connection to disconnect from");
 		}
-
+*/
 	}
 
 	/**
@@ -215,6 +219,11 @@ public class AsynchronousClient {
 		this.ownAddress = ownAddress;
 	}
 
+	public void setAutomaticIP() {
+	//	ownAddress = UPnP.getLocalIP();
+		ownAddress = "192.168.1.73";
+	}
+
 	public ArrayList<String> getAvailableIP() {
 
 		@SuppressWarnings("rawtypes")
@@ -239,6 +248,22 @@ public class AsynchronousClient {
 
 		return addresses;
 	}
+	
+	
+	private void openOnRandom () {
+		
+		try {
+			
+			client = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, 0));
+			clientport = ((InetSocketAddress) client.getLocalAddress()).getPort(); 
+
+		} catch (IOException e) {
+			
+			
+			e.printStackTrace();
+			
+		}
+	}
 
 	/**
 	 * Opens an AsynchronousServerSocketChannel and binds it to the client port
@@ -247,15 +272,7 @@ public class AsynchronousClient {
 	 */
 	private void startConnection() {
 
-		try {
-
-			// System.out.println(ownAddress);
-			client = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, clientPort));
-
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		openOnRandom();
 
 		ServerInfo serverinfo = new ServerInfo();
 		connectionHandler = new ClientConnectionHandler(this, messageHandler);
@@ -314,7 +331,10 @@ public class AsynchronousClient {
 
 		try {
 			String serializedMessage;
-			ConnectionInternalMessage outMessage = new ConnectionInternalMessage(ownAddress, clientPort);
+			//ConnectionInternalMessage outMessage = new ConnectionInternalMessage(ownAddress, clientPort);
+			HandShakeInternalMessage outMessage = new HandShakeInternalMessage(); 
+			outMessage.address = ownAddress;
+			outMessage.port = clientport;
 			clientBAOS = new ByteArrayOutputStream();
 			clientOutput = new ObjectOutputStream(clientBAOS);
 			clientOutput.writeObject(outMessage);

@@ -35,6 +35,7 @@ public class ClientInfo {
 	protected ObjectInputStream clientOutput;
 	protected long newTimeStamp;
 	protected long lastHeartBeat;
+	protected int clientport; 
 
 	@SuppressWarnings("unused")
 	private AsynchronousSocketChannel client;
@@ -47,7 +48,7 @@ public class ClientInfo {
 	}
 
 	protected ClientInfo(AsynchronousServerSocketChannel server, AsynchronousSocketChannel client, ByteBuffer buffer,
-			SocketAddress clientAddr, int clientID, int clientport) {
+			SocketAddress clientAddr, int clientID) {
 
 		this.client = client;
 		lineList = new ArrayList<String>();
@@ -67,10 +68,12 @@ public class ClientInfo {
 		lastHeartBeatServerSide = 0;
 	}
 
-	protected void connectToClient(String clientip, int clientport) {
+	protected void connectToClient(String clientIP, int clientport) {
+		
+		this.clientport = clientport; 
 
 		try {
-			clientOut = SocketChannel.open(new InetSocketAddress(clientip, clientport));
+			clientOut = SocketChannel.open(new InetSocketAddress(clientIP,clientport));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
