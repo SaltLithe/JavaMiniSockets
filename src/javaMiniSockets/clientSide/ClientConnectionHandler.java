@@ -90,18 +90,17 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	}
 
-
-	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	private void stopReading() {
-		if(!fixedReader.isShutdown()) {
-		fixedReader.shutdown();
+		if (!fixedReader.isShutdown()) {
+			fixedReader.shutdown();
 		}
 	}
+
 	/**
 	 * Continously checks if there are messages coming from the server.
 	 */
-	
+
 	private void readloop() {
 
 		int bytesRead = -1;
@@ -115,9 +114,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			e.printStackTrace();
 		} catch (ExecutionException e) {
 
-			
 			messageHandler.onServerDisconnect(serverInfo);
-			stopReading(); 
+			stopReading();
 
 		}
 
@@ -125,39 +123,35 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			if (serverInfo.inputBuffer.position() > 2) {
 				serverInfo.inputBuffer.flip();
 
-				// Read
 				byte[] lineBytes = new byte[bytesRead];
-				serverInfo.inputBuffer.get(lineBytes, 0, bytesRead);
 
-				// Lines are separated by system line separator and processed individually
-				String fullLine = new String(lineBytes);
-				String[] lines = fullLine.split(separator);
-				serverInfo.inputBuffer.clear();
+				int messageSize = serverInfo.inputBuffer.getInt();
 
-				// Deserialize
-				for (String line : lines) {
-					byte b[] = line.getBytes();
-					serverInfo.serverInputBAOS = new ByteArrayInputStream(b);
-					try {
-						serverInfo.serverInput = new ObjectInputStream(serverInfo.serverInputBAOS);
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-					Serializable message = null;
-					try {
-		
-						message = (Serializable) serverInfo.serverInput.readObject();
-						serverInfo.serverInput.close();
-						serverInfo.serverInputBAOS.close();
-					   
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-					// Send to queue
-					MessageInfoPair pair = new MessageInfoPair(message, serverInfo);
+				
+				serverInfo.inputBuffer.get(lineBytes, 0, messageSize);
 
-					asyncClient.sendMessageToReadingQueue(pair);
+
+				serverInfo.serverInputBAOS = new ByteArrayInputStream(lineBytes);
+				try {
+					serverInfo.serverInput = new ObjectInputStream(serverInfo.serverInputBAOS);
+				} catch (IOException e1) {
+					e1.printStackTrace();
 				}
+				Serializable message = null;
+				try {
+
+					message = (Serializable) serverInfo.serverInput.readObject();
+					serverInfo.serverInput.close();
+					serverInfo.serverInputBAOS.close();
+
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				// Send to queue
+				MessageInfoPair pair = new MessageInfoPair(message, serverInfo);
+
+				asyncClient.sendMessageToReadingQueue(pair);
+				
 			}
 		}
 

@@ -56,6 +56,8 @@ public class AsynchronousServer {
 	private ObjectOutputStream serializeOutput;
 	private Thread serverThread;
 	private String ownAddress;
+	private ObjectOutputStream calculateSizeOutput;
+	private ByteArrayOutputStream calculateBAOS;
 
 	/**
 	 * 
@@ -147,18 +149,24 @@ public class AsynchronousServer {
 				String serializedMessage;
 				CommonInternalMessage outMessage = new CommonInternalMessage(messages[i], 0);
 
+			
+				
 				serializeOutput.writeObject(outMessage);
 				serializeOutput.flush();
 				serializeOutput.close();
 				serializedMessage = serializeBAOS.toString();
 				serializeBAOS.close();
 				serializedMessages[i] = serializedMessage;
+				
+			
 			}
 
 			for (ClientInfo client : clientes.values()) {
 				sendPool.execute(() -> {
+					
+					
 					try {
-						sendRoutine(client, serializedMessages);
+						sendRoutine(client, serializedMessages );
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -196,6 +204,8 @@ public class AsynchronousServer {
 					serializeOutput.flush();
 					serializeOutput.close();
 					serializedMessage = serializeBAOS.toString();
+					
+					
 					serializeBAOS.close();
 					serializedMessages[i] = serializedMessage;
 				}
@@ -233,8 +243,13 @@ public class AsynchronousServer {
 			client.clientInputLock.lock();
 
 			for (String message : serializedMessages) {
-				message += System.lineSeparator();
+				byte[] utf8Bytes = message.getBytes();
+				int messageSize = utf8Bytes.length;
+		
+				byte[] size = ByteBuffer.allocate(4).putInt(messageSize).array();
+				//byte[] size = ByteBuffer.allocate(4).putInt(69).array(); 
 				client.inputBuffer = ByteBuffer.allocate(6144);
+				client.inputBuffer.put(size);
 				client.inputBuffer.put(message.getBytes());
 				client.inputBuffer.flip();
 				client.clientOut.write(client.inputBuffer);
