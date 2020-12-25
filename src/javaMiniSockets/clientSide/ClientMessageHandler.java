@@ -28,5 +28,10 @@ public interface ClientMessageHandler {
 	 * Called by the client when it disconnects
 	 */
 	public void onDisconnect();
+	
+	/**
+	 * Called by the client when it fails to connect to the server
+	 */
+	public void onConnectFail();
 
 }

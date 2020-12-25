@@ -8,6 +8,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -229,9 +230,11 @@ public class AsynchronousServer {
 
 		try {
 			client.clientOutputLock.lock();
+			client.clientInputLock.lock();
 
 			for (String message : serializedMessages) {
 				message += System.lineSeparator();
+				client.inputBuffer = ByteBuffer.allocate(6144);
 				client.inputBuffer.put(message.getBytes());
 				client.inputBuffer.flip();
 				client.clientOut.write(client.inputBuffer);
@@ -242,6 +245,7 @@ public class AsynchronousServer {
 		} catch (Exception e) {
 		} finally {
 			client.clientOutputLock.unlock();
+			client.clientInputLock.unlock();
 		}
 
 	}
@@ -364,6 +368,9 @@ public class AsynchronousServer {
 			lastReadMessage = messageQueue.take();
 
 		} catch (Exception e) {
+
+		
+		
 		}
 		return lastReadMessage;
 

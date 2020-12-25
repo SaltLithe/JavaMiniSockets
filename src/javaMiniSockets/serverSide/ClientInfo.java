@@ -60,7 +60,7 @@ public class ClientInfo {
 		clientInputLock = new ReentrantLock();
 		clientOutputLock = new ReentrantLock();
 		clientInputLock.lock();
-		clientOutputLock.lock();
+		clientOutputLock.lock();	
 
 		clientInputLock.unlock();
 		clientOutputLock.unlock();

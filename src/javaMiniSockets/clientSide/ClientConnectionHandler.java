@@ -32,7 +32,7 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private long delay_N = 33;
 	private int FixedReader_N = 1;
 	private int initialDelay_N = 0;
-	private int bufferSize_N = 2048;
+	private int bufferSize_N = 6144;
 	@SuppressWarnings("unused")
 	private ByteBuffer inputBuffer;
 	private ServerInfo serverInfo;
@@ -145,10 +145,12 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 					}
 					Serializable message = null;
 					try {
+		
 						message = (Serializable) serverInfo.serverInput.readObject();
 						serverInfo.serverInput.close();
 						serverInfo.serverInputBAOS.close();
-					} catch (ClassNotFoundException | IOException e) {
+					   
+					} catch (Exception e) {
 						e.printStackTrace();
 					}
 					// Send to queue

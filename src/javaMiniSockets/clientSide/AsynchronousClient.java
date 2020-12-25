@@ -153,8 +153,6 @@ public class AsynchronousClient {
 			stopHeartBeat();
 			serverSocket.close();
 			messageHandler.onDisconnect();
-
-
 	}
 
 	/**
@@ -289,9 +287,8 @@ public class AsynchronousClient {
 			sendAddressInfo();
 			messageHandler.onConnect();
 		} catch (IOException e) {
+			messageHandler.onConnectFail(); 
 			serverSocket = null;
-			System.err.println("Unable to connect to the server");
-			e.printStackTrace();
 		}
 	}
 
