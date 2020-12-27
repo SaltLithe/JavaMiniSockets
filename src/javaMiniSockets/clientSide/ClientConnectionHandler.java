@@ -46,7 +46,7 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	protected ClientConnectionHandler(AsynchronousClient asynchronousClient, ClientMessageHandler messageHandler2) {
 		asyncClient = asynchronousClient;
 		messageHandler = messageHandler2;
-		separator = System.lineSeparator();
+		separator = "DONOTWRITETHIS";
 		fixedReader = Executors.newScheduledThreadPool(FixedReader_N);
 
 	}

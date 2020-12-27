@@ -50,7 +50,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private int bufferSize_N = 6144;
 	private int surplus = 0;
 	private int ReaderPool_N;
-	private String separator = System.lineSeparator();
+	private String separator ="DONOTWRITETHIS";
 	private ServerMessageHandler serverMessageHandler;
 
 	/**

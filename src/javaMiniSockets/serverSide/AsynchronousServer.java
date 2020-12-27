@@ -233,7 +233,7 @@ public class AsynchronousServer {
 			client.clientInputLock.lock();
 
 			for (String message : serializedMessages) {
-				message += System.lineSeparator();
+				message += "DONOTWRITETHIS";
 				client.inputBuffer = ByteBuffer.allocate(6144);
 				client.inputBuffer.put(message.getBytes());
 				client.inputBuffer.flip();

@@ -366,7 +366,7 @@ public class AsynchronousClient {
 			heartOutput.writeObject(heartbeat);
 			serializedMessage = heartBAOS.toString();
 
-			serializedMessage += System.lineSeparator();
+			serializedMessage += "DONOTWRITETHIS";
 
 			outputbuffer.put(serializedMessage.getBytes());
 			outputbuffer.flip();
@@ -429,7 +429,7 @@ public class AsynchronousClient {
 
 		clientLock.lock();
 		try {
-			serializedMessage += System.lineSeparator();
+			serializedMessage += "DONOTWRITETHIS";
 
 			outputbuffer.put(serializedMessage.getBytes());
 			outputbuffer.flip();
