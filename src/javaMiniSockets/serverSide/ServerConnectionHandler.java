@@ -1,7 +1,6 @@
 package javaMiniSockets.serverSide;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -41,7 +40,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private AtomicInteger connected;
 	private AsynchronousServer asyncServer;
 	private final int MaxConnections;
-	//private int clientport;
+	// private int clientport;
 	private float heartbeatminimumClientSide = 10000;
 	private float heartbeatminimumServerSide = 10000;
 	private long delay_N = 33;
@@ -50,7 +49,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private int bufferSize_N = 2048;
 	private int surplus = 0;
 	private int ReaderPool_N;
-	private String separator ="DONOTWRITETHIS";
+	private String separator = "DONOTWRITETHIS";
 	private ServerMessageHandler serverMessageHandler;
 
 	/**
@@ -63,7 +62,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 		serverMessageHandler = mHandler;
 		MaxConnections = max;
-		//this.clientport = clientport;
+		// this.clientport = clientport;
 		this.asyncServer = server;
 		ReaderPool_N = MaxConnections + surplus;
 
@@ -131,8 +130,10 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				SocketAddress clientAddr = client.getRemoteAddress();
 				clientInfo.server.accept(clientInfo, this);
 				int clientID = ids.getAndIncrement();
-				//Crear un mensaje especifico de conexion hacia atras que se detecte en bucle principal en un else al final porque si no no deja
-				//crear varios clientes por equipo y es una porqueria que el usuario tenga que saberse dos puertos , ugh 
+				// Crear un mensaje especifico de conexion hacia atras que se detecte en bucle
+				// principal en un else al final porque si no no deja
+				// crear varios clientes por equipo y es una porqueria que el usuario tenga que
+				// saberse dos puertos , ugh
 
 				ClientInfo newClientInfo = new ClientInfo(clientInfo.server, client, ByteBuffer.allocate(bufferSize_N),
 						clientAddr, clientID);
@@ -177,6 +178,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private void readcheck(ClientInfo clientInfo) {
 
 		clientInfo.clientInputLock.lock();
+		
 
 		try {
 
@@ -185,6 +187,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			try {
 
 				bytesRead = clientInfo.clientIn.read(clientInfo.inputBuffer).get();
+				System.out.println("READING  THIS MANY BYTES : " + bytesRead);
 
 			} catch (ReadPendingException e) {
 				// This should not happen with the semaphore in place
@@ -219,7 +222,9 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 					clientInfo.inputBuffer.clear();
 
 					// Deserialize
-					for (int i = 0 ; i < lines.length ; i ++) {
+					for (int i = 0; i < lines.length; i++) {
+						System.out.println("SERVER IS READING LINE : " + i );
+
 						String line = lines[i];
 						byte b[] = line.getBytes();
 						clientInfo.clientInputBAOS = new ByteArrayInputStream(b);
@@ -227,7 +232,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 						try {
 
-							
 							clientInfo.clientInput = new ObjectInputStream(clientInfo.clientInputBAOS);
 
 						} catch (IOException e1) {
@@ -237,8 +241,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 						try {
 
-							
-							//System.out.println(clientInfo.clientInput.readObject().toString());
+							// System.out.println(clientInfo.clientInput.readObject().toString());
 							message = (Serializable) clientInfo.clientInput.readObject();
 							clientInfo.clientInput.close();
 							clientInfo.clientInputBAOS.close();
@@ -248,11 +251,12 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 							e.printStackTrace();
 						}
 						// Send to queue
+						if(message != null) {
 						MessageInfoPair pair = new MessageInfoPair(message, clientInfo);
 
 						asyncServer.sendMessageToReadingQueue(pair);
 						clientInfo.lastHeartBeatServerSide = 0;
-
+						}
 					}
 				}
 				clientInfo.lastHeartBeatServerSide = System.currentTimeMillis();
@@ -380,10 +384,10 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		connected.set(0);
 	}
 
-	public void openBackwardsConnection(int clientID , String clientIP , int clientPort) {
+	public void openBackwardsConnection(int clientID, String clientIP, int clientPort) {
 		System.out.println("Client ip is : " + clientIP);
 		this.clients.get(clientID).connectToClient(clientIP, clientPort);
-		
+
 	}
 
 }

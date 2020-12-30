@@ -9,9 +9,11 @@ import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.channels.ReadPendingException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javaMiniSockets.messages.MessageInfoPair;
 import javaMiniSockets.serverSide.ServerCouldNotConnectException;
@@ -28,15 +30,17 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	private String separator;
 	private ScheduledExecutorService fixedReader;
+	private ExecutorService readerPool;
 	private AsynchronousClient asyncClient;
 	private long delay_N = 33;
-	private int FixedReader_N = 1;
+	private int FixedReader_N = 6;
 	private int initialDelay_N = 0;
-	private int bufferSize_N = 2048;
+	private int bufferSize_N = 6144;
 	@SuppressWarnings("unused")
 	private ByteBuffer inputBuffer;
 	private ServerInfo serverInfo;
 	private ClientMessageHandler messageHandler;
+	private ReentrantLock inputLock;
 
 	/**
 	 * 
@@ -44,6 +48,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 * @param messageHandler
 	 */
 	protected ClientConnectionHandler(AsynchronousClient asynchronousClient, ClientMessageHandler messageHandler2) {
+		readerPool = Executors.newFixedThreadPool(6);
+		inputLock = new ReentrantLock();
 		asyncClient = asynchronousClient;
 		messageHandler = messageHandler2;
 		separator = "DONOTWRITETHIS";
@@ -70,7 +76,18 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		fixedReader.scheduleAtFixedRate(new Runnable() {
 			@Override
 			public void run() {
-				readloop();
+				
+					readCheck();
+				
+			}
+
+			private void readCheck() {
+				try {
+				if (!inputLock.isLocked()) {
+					readerPool.execute(()-> readloop());
+				}
+				}catch(Exception e) {}
+				
 			}
 		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
 
@@ -90,20 +107,21 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	}
 
-
-	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	private void stopReading() {
-		if(!fixedReader.isShutdown()) {
-		fixedReader.shutdown();
+		if (!fixedReader.isShutdown()) {
+			fixedReader.shutdown();
 		}
 	}
+
 	/**
 	 * Continously checks if there are messages coming from the server.
 	 */
-	
+
 	private void readloop() {
 
+	inputLock.lock();
+	try {
 		int bytesRead = -1;
 		try {
 
@@ -115,13 +133,13 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			e.printStackTrace();
 		} catch (ExecutionException e) {
 
-			
 			messageHandler.onServerDisconnect(serverInfo);
-			stopReading(); 
+			stopReading();
 
 		}
 
 		if (bytesRead != -1) {
+
 			if (serverInfo.inputBuffer.position() > 2) {
 				serverInfo.inputBuffer.flip();
 
@@ -135,7 +153,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				serverInfo.inputBuffer.clear();
 
 				// Deserialize
-				for (String line : lines) {
+				for (int i = 0 ; i < lines.length ; i ++) {
+					String line = lines[i];
 					byte b[] = line.getBytes();
 					serverInfo.serverInputBAOS = new ByteArrayInputStream(b);
 					try {
@@ -145,22 +164,32 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 					}
 					Serializable message = null;
 					try {
-		
+
 						message = (Serializable) serverInfo.serverInput.readObject();
 						serverInfo.serverInput.close();
-						serverInfo.serverInputBAOS.close();
-					   
+					//	serverInfo.serverInputBAOS.close();
+						serverInfo.serverInputBAOS.reset(); 
+
+
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
 					// Send to queue
+					if(message != null) {
 					MessageInfoPair pair = new MessageInfoPair(message, serverInfo);
 
 					asyncClient.sendMessageToReadingQueue(pair);
+					}
 				}
 			}
 		}
 
 	}
+	
+catch(Exception e) {}
+finally {
+	inputLock.unlock();
 
+}
+}
 }

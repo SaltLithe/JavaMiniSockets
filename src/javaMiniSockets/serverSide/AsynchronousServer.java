@@ -227,14 +227,13 @@ public class AsynchronousServer {
 	 * @throws IOException
 	 */
 	private void sendRoutine(ClientInfo client, String[] serializedMessages) throws IOException {
-
+		client.clientOutputLock.lock();
 		try {
-			client.clientOutputLock.lock();
-			client.clientInputLock.lock();
+		
 
 			for (String message : serializedMessages) {
 				message += "DONOTWRITETHIS";
-				client.inputBuffer = ByteBuffer.allocate(6144);
+			//	client.inputBuffer = ByteBuffer.allocate(message.getBytes().length);
 				client.inputBuffer.put(message.getBytes());
 				client.inputBuffer.flip();
 				client.clientOut.write(client.inputBuffer);
@@ -245,7 +244,7 @@ public class AsynchronousServer {
 		} catch (Exception e) {
 		} finally {
 			client.clientOutputLock.unlock();
-			client.clientInputLock.unlock();
+
 		}
 
 	}
