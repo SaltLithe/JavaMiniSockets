@@ -187,7 +187,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			try {
 
 				bytesRead = clientInfo.clientIn.read(clientInfo.inputBuffer).get();
-				System.out.println("READING  THIS MANY BYTES : " + bytesRead);
 
 			} catch (ReadPendingException e) {
 				// This should not happen with the semaphore in place
@@ -223,7 +222,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 					// Deserialize
 					for (int i = 0; i < lines.length; i++) {
-						System.out.println("SERVER IS READING LINE : " + i );
 
 						String line = lines[i];
 						byte b[] = line.getBytes();

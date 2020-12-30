@@ -180,7 +180,6 @@ public class AsynchronousServer {
 	 */
 	public void broadcastAllMessage(Serializable[] messages) throws IOException {
 		try {
-			// sendLock.lock();
 			if (serverHandler != null) {
 				ConcurrentHashMap<Integer, ClientInfo> clientes = serverHandler.getAllClients();
 				String[] serializedMessages = new String[messages.length];
@@ -213,7 +212,6 @@ public class AsynchronousServer {
 			}
 		} finally {
 
-			// sendLock.unlock();
 		}
 	}
 
