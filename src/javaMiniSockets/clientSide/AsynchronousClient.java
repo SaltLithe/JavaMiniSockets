@@ -24,10 +24,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+
+
 //import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
-import javaMiniSockets.messages.ConnectionInternalMessage;
 import javaMiniSockets.messages.HandShakeInternalMessage;
 import javaMiniSockets.messages.MessageInfoPair;
 
@@ -72,7 +73,9 @@ public class AsynchronousClient {
 	public int serverPort;
 	private int attemptCount = 0 ; 
 	private int clientport; 
-
+	private long connectionDelay = 10000;
+	boolean connectedFlag = false;
+	
 	/**
 	 * How often a heartbeat message is sent in milliseconds.
 	 */
@@ -153,6 +156,7 @@ public class AsynchronousClient {
 			stopHeartBeat();
 			serverSocket.close();
 			messageHandler.onDisconnect();
+			connectedFlag = false;
 	}
 
 	/**
@@ -271,18 +275,53 @@ public class AsynchronousClient {
 		connectionHandler = new ClientConnectionHandler(this, messageHandler);
 		serverinfo.client = client;
 		client.accept(serverinfo, connectionHandler);
+
 	}
 
+	private void connectionTimeout() {
+		
+	
+			
+			try {
+				Thread.sleep(connectionDelay);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+				if (!connectedFlag) {
+
+					try {
+						System.out.println("Disconnected");
+
+						disconnect();
+					} catch (NotConnectedYetException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+				}
+			
+		
+		
+	}
 	/**
 	 * Conects the client to the server.
 	 * 
 	 * @throws IOException
 	 */
+
 	private void connect() throws IOException {
 
 		try {
+			new Thread(()-> connectionTimeout()).start();
 			serverSocket = SocketChannel.open(new InetSocketAddress(address, port));
-
+			
+			
 			startHeartBeat();
 			sendAddressInfo();
 			messageHandler.onConnect();

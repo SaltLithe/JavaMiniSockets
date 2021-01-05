@@ -8,7 +8,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -123,6 +122,11 @@ public class AsynchronousServer {
 
 		return allclients;
 
+	}
+	
+	
+	public void close() {
+		serverHandler.close();
 	}
 
 	/**

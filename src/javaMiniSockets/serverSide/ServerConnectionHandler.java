@@ -51,6 +51,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private int ReaderPool_N;
 	private String separator = "DONOTWRITETHIS";
 	private ServerMessageHandler serverMessageHandler;
+	private boolean closed;
 
 	/**
 	 * 
@@ -60,6 +61,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 */
 	protected ServerConnectionHandler(AsynchronousServer server, int max, ServerMessageHandler mHandler) {
 
+		closed = false;
 		serverMessageHandler = mHandler;
 		MaxConnections = max;
 		// this.clientport = clientport;
@@ -97,7 +99,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		try {
 			addClient(client, attach);
 		} catch (MaximumConnectionsReachedException e) {
-			e.printStackTrace();
+		//	e.printStackTrace();
 		}
 
 	}
@@ -125,15 +127,12 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private synchronized void addClient(AsynchronousSocketChannel client, ClientInfo clientInfo)
 			throws MaximumConnectionsReachedException {
 
-		if (connected.get() < MaxConnections) {
+		if (connected.get() < MaxConnections && !closed) {
 			try {
 				SocketAddress clientAddr = client.getRemoteAddress();
 				clientInfo.server.accept(clientInfo, this);
 				int clientID = ids.getAndIncrement();
-				// Crear un mensaje especifico de conexion hacia atras que se detecte en bucle
-				// principal en un else al final porque si no no deja
-				// crear varios clientes por equipo y es una porqueria que el usuario tenga que
-				// saberse dos puertos , ugh
+				
 
 				ClientInfo newClientInfo = new ClientInfo(clientInfo.server, client, ByteBuffer.allocate(bufferSize_N),
 						clientAddr, clientID);
@@ -380,6 +379,10 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		}
 
 		connected.set(0);
+	}
+	
+	protected void  close() {
+		closed = true; 
 	}
 
 	public void openBackwardsConnection(int clientID, String clientIP, int clientPort) {

@@ -91,6 +91,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			}
 		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
 
+		asyncClient.connectedFlag = true;
+
 		messageHandler.onServerConnect(serverInfo);
 	}
 
