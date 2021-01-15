@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javaMiniSockets.clientSide.ClientCouldNotConnectException;
+import javaMiniSockets.messages.HandShakeInternalMessage;
 import javaMiniSockets.messages.MessageInfoPair;
 
 /***
@@ -46,7 +47,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private long delay_N = 33;
 	private int FixedReader_N = 1;
 	private int initialDelay_N = 0;
-	private int bufferSize_N = 2048;
+	private int bufferSize_N =  8192;
 	private int surplus = 0;
 	private int ReaderPool_N;
 	private String separator = "DONOTWRITETHIS";
@@ -64,7 +65,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		closed = false;
 		serverMessageHandler = mHandler;
 		MaxConnections = max;
-		// this.clientport = clientport;
 		this.asyncServer = server;
 		ReaderPool_N = MaxConnections + surplus;
 
@@ -158,19 +158,20 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 * 
 	 * @param clientInfo
 	 */
-	protected void disconnectClient(ClientInfo clientInfo) {
+	protected void disconnectClient(ClientInfo clientInfo , int ClientID) {
 		try {
 			clientInfo.clientInputLock.lock();
 			clientInfo.clientOutputLock.lock();
 			clients.remove(clientInfo.clientID);
 			connected.decrementAndGet();
 			clientInfo.clientOut.close();
+			clientInfo.clientInputLock.unlock();
+			clientInfo.clientOutputLock.unlock();
 		} catch (Exception e) {
 
 		} finally {
-			clientInfo.clientInputLock.unlock();
-			clientInfo.clientOutputLock.unlock();
-			serverMessageHandler.onClientDisconnect(clientInfo);
+	
+			serverMessageHandler.onClientDisconnect(ClientID);
 		}
 	}
 
@@ -238,17 +239,24 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 						try {
 
-							// System.out.println(clientInfo.clientInput.readObject().toString());
+				
+								
 							message = (Serializable) clientInfo.clientInput.readObject();
+							HandShakeInternalMessage ms;
+						
+							
+
 							clientInfo.clientInput.close();
 							clientInfo.clientInputBAOS.close();
 							clientInfo.clientInputBAOS.reset();
-
+							
+						
 						} catch (ClassNotFoundException | IOException e) {
 							e.printStackTrace();
 						}
 						// Send to queue
 						if(message != null) {
+						System.out.println("Sending to queue");
 						MessageInfoPair pair = new MessageInfoPair(message, clientInfo);
 
 						asyncServer.sendMessageToReadingQueue(pair);
@@ -263,7 +271,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				// System.out.println(System.currentTimeMillis() -
 				// clientInfo.lastHeartBeatServerSide);
 				if (System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide >= heartbeatminimumServerSide) {
-					disconnectClient(clientInfo);
+					disconnectClient(clientInfo , clientInfo.clientID);
 				}
 				updateHeartBeat(clientInfo.clientID, System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide);
 
@@ -328,7 +336,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 * @param clientID
 	 */
 	protected void disconnectClient(int clientID) {
-		disconnectClient(clients.get(clientID));
+		disconnectClient(clients.get(clientID), clientID);
 	}
 
 	/**
@@ -346,13 +354,13 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			if (last - clients.get(clientID).lastHeartBeat > heartbeatminimumClientSide) {
 				// System.out.println("Last heartbeat " + (last -
 				// clients.get(clientID).lastHeartBeat));
-				disconnectClient(clients.get(clientID));
+				disconnectClient(clients.get(clientID), clientID);
 			} else {
 				clients.get(clientID).lastHeartBeat = last;
 			}
 		} catch (NullPointerException e) {
 
-			disconnectClient(clients.get(clientID));
+			disconnectClient(clients.get(clientID), clientID);
 		}
 	}
 

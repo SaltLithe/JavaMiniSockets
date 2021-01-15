@@ -73,8 +73,9 @@ public class AsynchronousClient {
 	public int serverPort;
 	private int attemptCount = 0 ; 
 	private int clientport; 
-	private long connectionDelay = 10000;
+	private long connectionDelay = 15000;
 	boolean connectedFlag = false;
+	private String separator; 
 	
 	/**
 	 * How often a heartbeat message is sent in milliseconds.
@@ -83,7 +84,7 @@ public class AsynchronousClient {
 	/*
 	 * Size of the buffer used to send messages to the server
 	 */
-	public int outputbufferSize = 4096;
+	public int outputbufferSize = 8192;
 	/**
 	 * Information about the server the client is connected to.
 	 */
@@ -99,8 +100,8 @@ public class AsynchronousClient {
 	 *                      messages. Any dynamic port up to 65,536.
 	 */
 	public AsynchronousClient(String serverAddress, String ownAddress, int serverPort, 
-			ClientMessageHandler handler) {
-
+			ClientMessageHandler handler,String separator) {
+this.separator = separator; 
 		if (ownAddress != null) {
 
 			this.ownAddress = ownAddress;
@@ -318,17 +319,21 @@ public class AsynchronousClient {
 	private void connect() throws IOException {
 
 		try {
-			new Thread(()-> connectionTimeout()).start();
+		//	new Thread(()-> connectionTimeout()).start();
 			serverSocket = SocketChannel.open(new InetSocketAddress(address, port));
 			
 			
-			startHeartBeat();
 			sendAddressInfo();
+			startHeartBeat();
+			
+			
+
 			messageHandler.onConnect();
 		} catch (IOException e) {
 			messageHandler.onConnectFail(); 
 			serverSocket = null;
 		}
+		
 	}
 
 	/**
@@ -360,12 +365,13 @@ public class AsynchronousClient {
 
 	private void sendAddressInfo() {
 
+		System.out.println("SENDING HANXDSHAKE");
 		try {
 			String serializedMessage;
-			//ConnectionInternalMessage outMessage = new ConnectionInternalMessage(ownAddress, clientPort);
-			HandShakeInternalMessage outMessage = new HandShakeInternalMessage(); 
-			outMessage.address = ownAddress;
-			outMessage.port = clientport;
+			HandShakeInternalMessage outMessage = new HandShakeInternalMessage(ownAddress , clientport); 
+			System.out.println(outMessage.toString());
+			System.out.println(outMessage.address);
+			System.out.println(outMessage.port);
 			clientBAOS = new ByteArrayOutputStream();
 			clientOutput = new ObjectOutputStream(clientBAOS);
 			clientOutput.writeObject(outMessage);
@@ -374,8 +380,10 @@ public class AsynchronousClient {
 			serializedMessage = clientBAOS.toString();
 			clientBAOS.flush();
 			clientBAOS.close();
-			// System.out.println("Sending bytes" + serializedMessage.getBytes().length);
+			System.out.println("Sending bytes" + serializedMessage.getBytes().length);
+			System.out.println(serializedMessage);
 
+			/*
 			executor.execute(() -> {
 				try {
 					sendRoutine(serializedMessage);
@@ -383,9 +391,14 @@ public class AsynchronousClient {
 					e.printStackTrace();
 				}
 			});
+			*/
+			sendRoutine(serializedMessage);
+
 		} catch (Exception e) {
 		}
+		
 	}
+	
 
 	/**
 	 * Continously sends a heartbeat message to the server to indicate that it is
@@ -405,7 +418,7 @@ public class AsynchronousClient {
 			heartOutput.writeObject(heartbeat);
 			serializedMessage = heartBAOS.toString();
 
-			serializedMessage += "DONOTWRITETHIS";
+			serializedMessage += separator;
 
 			outputbuffer.put(serializedMessage.getBytes());
 			outputbuffer.flip();
@@ -468,13 +481,15 @@ public class AsynchronousClient {
 
 		clientLock.lock();
 		try {
-			serializedMessage += "DONOTWRITETHIS";
+			serializedMessage += separator;
 
+			
 			outputbuffer.put(serializedMessage.getBytes());
 			outputbuffer.flip();
 			serverSocket.write(outputbuffer);
 
 			outputbuffer.clear();
+			
 
 		} catch (Exception e) {
 		} finally {

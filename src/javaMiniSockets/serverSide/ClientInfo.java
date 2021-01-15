@@ -74,6 +74,7 @@ public class ClientInfo {
 
 		try {
 			clientOut = SocketChannel.open(new InetSocketAddress(clientIP,clientport));
+			System.out.println("Connected back");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

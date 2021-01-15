@@ -35,7 +35,7 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private long delay_N = 33;
 	private int FixedReader_N = 6;
 	private int initialDelay_N = 0;
-	private int bufferSize_N = 6144;
+	private int bufferSize_N = 8192;
 	@SuppressWarnings("unused")
 	private ByteBuffer inputBuffer;
 	private ServerInfo serverInfo;

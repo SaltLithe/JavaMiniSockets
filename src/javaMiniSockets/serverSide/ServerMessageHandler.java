@@ -36,8 +36,8 @@ public interface ServerMessageHandler {
 	/**
 	 * Called by the server whenever a client disconnects
 	 * 
-	 * @param client
+	 * @param clientID
 	 */
-	public void onClientDisconnect(ClientInfo client);
+	public void onClientDisconnect(int clientID);
 
 }

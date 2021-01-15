@@ -55,6 +55,7 @@ public class AsynchronousServer {
 	private ObjectOutputStream serializeOutput;
 	private Thread serverThread;
 	private String ownAddress;
+	private String separator;
 
 	/**
 	 * 
@@ -66,8 +67,9 @@ public class AsynchronousServer {
 	 */
 
 	public AsynchronousServer(String serverName, ServerMessageHandler messageHandler, int maxClients, int port,
-			String ownAddress, int messageQueueSize) {
+			String ownAddress, int messageQueueSize, String separator) {
 
+		this.separator = separator; 
 		if (ownAddress != null) {
 			this.ownAddress = ownAddress;
 		}
@@ -89,6 +91,7 @@ public class AsynchronousServer {
 	 */
 	public void Start() {
 
+		System.out.println("STARTING SERVER ");
 		serverThread = new Thread(() -> run());
 		// serverThread.setName(serverName);
 		serverThread.start();
@@ -234,8 +237,7 @@ public class AsynchronousServer {
 		
 
 			for (String message : serializedMessages) {
-				message += "DONOTWRITETHIS";
-			//	client.inputBuffer = ByteBuffer.allocate(message.getBytes().length);
+				message += separator;
 				client.inputBuffer.put(message.getBytes());
 				client.inputBuffer.flip();
 				client.clientOut.write(client.inputBuffer);
@@ -300,6 +302,7 @@ public class AsynchronousServer {
 			// System.out.println(ownAddress);
 			server = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, port));
 
+			System.out.println("started");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -323,6 +326,9 @@ public class AsynchronousServer {
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
+				System.out.println("Processing : " + resultado.get().getMessage().toString());
+
+				
 				try {
 					CommonInternalMessage incomingMessage = (CommonInternalMessage) resultado.get().getMessage();
 					// If the message is null it is considered a teartbeat from the client
@@ -387,6 +393,11 @@ public class AsynchronousServer {
 	 */
 	protected void sendMessageToReadingQueue(MessageInfoPair message) {
 		messageQueue.offer(message);
+	}
+
+	protected void clientDisconnected(ClientInfo client) {
+
+		messageHandler.onClientConnect(client);
 	}
 
 }
