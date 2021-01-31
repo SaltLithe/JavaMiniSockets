@@ -14,8 +14,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.google.common.util.concurrent.MoreExecutors;
 
 import javaMiniSockets.clientSide.ClientCouldNotConnectException;
 import javaMiniSockets.messages.MessageInfoPair;
@@ -35,8 +38,8 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	private ConcurrentHashMap<Integer, ClientInfo> clients;
 	private AtomicInteger ids;
-	private ScheduledExecutorService fixedReader;
-	private ExecutorService readerPool;
+	private ScheduledExecutorService fixedReaderPool;
+	private ExecutorService readerPoolPool;
 	private AtomicInteger connected;
 	private AsynchronousServer asyncServer;
 	private final int MaxConnections;
@@ -52,6 +55,8 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private String separator = "DONOTWRITETHIS";
 	private ServerMessageHandler serverMessageHandler;
 	private boolean closed;
+	ExecutorService fixedReader;
+	ExecutorService readerPool;
 
 	/**
 	 * 
@@ -71,15 +76,19 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		clients = new ConcurrentHashMap<Integer, ClientInfo>();
 		ids = new AtomicInteger();
 
-		fixedReader = Executors.newScheduledThreadPool(FixedReader_N);
-		readerPool = Executors.newFixedThreadPool(ReaderPool_N);
+		fixedReaderPool = Executors.newScheduledThreadPool(FixedReader_N);
+		readerPoolPool = Executors.newFixedThreadPool(ReaderPool_N);
 
-		fixedReader.scheduleAtFixedRate(new Runnable() {
+		fixedReaderPool.scheduleAtFixedRate(new Runnable() {
 			@Override
 			public void run() {
 				readloop();
 			}
 		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
+		
+		fixedReader = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) fixedReader, 100, TimeUnit.MILLISECONDS);
+		readerPool = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) readerPoolPool, 100, TimeUnit.MILLISECONDS);
+
 
 	}
 
