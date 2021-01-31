@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 
 //import com.dosse.upnp.UPnP;
@@ -56,6 +57,8 @@ public class AsynchronousServer {
 	private Thread serverThread;
 	private String ownAddress;
 	private String separator;
+	private Semaphore notifySem;
+	private Semaphore broadCastSem;
 
 	/**
 	 * 
@@ -68,12 +71,13 @@ public class AsynchronousServer {
 
 	public AsynchronousServer(String serverName, ServerMessageHandler messageHandler, int maxClients, int port,
 			String ownAddress, int messageQueueSize, String separator) {
-
+		broadCastSem = new Semaphore(1);
+		notifySem = new Semaphore(1);
 		this.separator = separator; 
 		if (ownAddress != null) {
 			this.ownAddress = ownAddress;
 		}
-		sendPool = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+		sendPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
 
 		this.messageQueue_N = messageQueueSize;
 		this.port = port;
@@ -91,7 +95,6 @@ public class AsynchronousServer {
 	 */
 	public void Start() {
 
-		System.out.println("STARTING SERVER ");
 		serverThread = new Thread(() -> run());
 		// serverThread.setName(serverName);
 		serverThread.start();
@@ -217,8 +220,9 @@ public class AsynchronousServer {
 				}
 
 			}
+		} catch (Exception e1) {
+			e1.printStackTrace();
 		} finally {
-
 		}
 	}
 
@@ -232,9 +236,10 @@ public class AsynchronousServer {
 	 * @throws IOException
 	 */
 	private void sendRoutine(ClientInfo client, String[] serializedMessages) throws IOException {
-		client.clientOutputLock.lock();
 		try {
-		
+			broadCastSem.acquire();
+			client.clientOutputLock.lock();
+
 
 			for (String message : serializedMessages) {
 				message += separator;
@@ -242,12 +247,16 @@ public class AsynchronousServer {
 				client.inputBuffer.flip();
 				client.clientOut.write(client.inputBuffer);
 				client.inputBuffer.clear();
+				Thread.sleep(50);
+
 
 			}
 
 		} catch (Exception e) {
 		} finally {
 			client.clientOutputLock.unlock();
+			broadCastSem.release();
+
 
 		}
 
@@ -302,7 +311,6 @@ public class AsynchronousServer {
 			// System.out.println(ownAddress);
 			server = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, port));
 
-			System.out.println("started");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -326,7 +334,6 @@ public class AsynchronousServer {
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
-				System.out.println("Processing : " + resultado.get().getMessage().toString());
 
 				
 				try {
@@ -334,7 +341,9 @@ public class AsynchronousServer {
 					// If the message is null it is considered a teartbeat from the client
 					if (incomingMessage != null) {
 						if (incomingMessage.getMessage() != null) {
+							notifySem.acquire();
 							messageHandler.onMessageSent(incomingMessage.getMessage(), resultado.get().getClient());
+							
 						}
 						serverHandler.updateHeartBeat(resultado.get().getClient().clientID,
 								incomingMessage.getTimestamp());
@@ -351,7 +360,6 @@ public class AsynchronousServer {
 
 						HandShakeInternalMessage incomingHandshake = (HandShakeInternalMessage) resultado.get()
 								.getMessage();
-						System.out.println("Incoming handshake is  : " + incomingHandshake.address);
 						serverHandler.openBackwardsConnection(resultado.get().getClient().clientID,
 								incomingHandshake.address, incomingHandshake.port);
 
@@ -361,6 +369,9 @@ public class AsynchronousServer {
 				e.printStackTrace();
 			} catch (ExecutionException e) {
 				e.printStackTrace();
+			}
+			finally {
+				notifySem.release();
 			}
 		}
 	}

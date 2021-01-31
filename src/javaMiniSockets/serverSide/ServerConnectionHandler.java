@@ -18,7 +18,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javaMiniSockets.clientSide.ClientCouldNotConnectException;
-import javaMiniSockets.messages.HandShakeInternalMessage;
 import javaMiniSockets.messages.MessageInfoPair;
 
 /***
@@ -242,7 +241,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				
 								
 							message = (Serializable) clientInfo.clientInput.readObject();
-							HandShakeInternalMessage ms;
 						
 							
 
@@ -256,7 +254,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 						}
 						// Send to queue
 						if(message != null) {
-						System.out.println("Sending to queue");
 						MessageInfoPair pair = new MessageInfoPair(message, clientInfo);
 
 						asyncServer.sendMessageToReadingQueue(pair);
@@ -300,6 +297,9 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				}
 			}
 
+		}else {
+			fixedReader.shutdown();
+			readerPool.shutdown(); 
 		}
 	}
 
@@ -375,6 +375,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 			try {
 				clients.get(key).clientOut.close();
+				clients.get(key).clientIn.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -383,6 +384,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			clients.get(key).clientOutputLock.unlock();
 
 			disconnectClient(key);
+			
 
 		}
 
@@ -394,7 +396,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	}
 
 	public void openBackwardsConnection(int clientID, String clientIP, int clientPort) {
-		System.out.println("Client ip is : " + clientIP);
 		this.clients.get(clientID).connectToClient(clientIP, clientPort);
 
 	}

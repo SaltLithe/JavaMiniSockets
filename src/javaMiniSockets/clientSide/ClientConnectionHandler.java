@@ -57,7 +57,6 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 	}
 
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/**
 	 * Called when the server opens a connection to send messages to the client.
@@ -169,7 +168,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 						message = (Serializable) serverInfo.serverInput.readObject();
 						serverInfo.serverInput.close();
-					//	serverInfo.serverInputBAOS.close();
+						//TODO  , REMOVED COMMENT FROM LINE BELOW , COULD CAUSE PROBLEMS
+						serverInfo.serverInputBAOS.close();
 						serverInfo.serverInputBAOS.reset(); 
 
 
