@@ -24,6 +24,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.util.concurrent.MoreExecutors;
+
 //import com.dosse.upnp.UPnP;
 
 import javaMiniSockets.messages.CommonInternalMessage;
@@ -56,11 +58,14 @@ public class AsynchronousClient {
 	private ObjectOutputStream heartOutput;
 	private ByteArrayOutputStream heartBAOS;
 	private ByteBuffer outputbuffer;
-	private ThreadPoolExecutor queueReader;
+	private ThreadPoolExecutor queueReaderPool;
+	private ExecutorService queueReader; 
 	private ClientMessageHandler messageHandler;
 	private String ownAddress;
 	private ExecutorService executor;
-	private ScheduledExecutorService beater;
+	private ExecutorService executorPool;
+	private ScheduledExecutorService beaterPool;
+	private ExecutorService beater; 
 	private int executorthreads_N = 1;
 	private Semaphore clientLock;
 	private MessageInfoPair lastReadMessage;
@@ -114,8 +119,10 @@ this.separator = separator;
 		messageQueue = new ArrayBlockingQueue<MessageInfoPair>(100);
 		@SuppressWarnings("unused")
 		MessageInfoPair lastReadMessage;
-		executor = Executors.newSingleThreadExecutor();
-		beater = Executors.newScheduledThreadPool(executorthreads_N);
+		executorPool = Executors.newSingleThreadExecutor();
+		executor = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) executorPool, 100 , TimeUnit.MILLISECONDS);
+		beaterPool = Executors.newScheduledThreadPool(executorthreads_N);
+		beater =  MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) beaterPool, 100, TimeUnit.MILLISECONDS);
 
 		clientLock = new Semaphore(1);
 		lastTimestamp = System.currentTimeMillis();
@@ -335,7 +342,8 @@ this.separator = separator;
 	 */
 	private void run() throws IOException {
 
-		queueReader = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
+		queueReaderPool = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
+		queueReader = MoreExecutors.getExitingExecutorService(queueReaderPool , 100 , TimeUnit.MILLISECONDS);
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
@@ -430,7 +438,7 @@ this.separator = separator;
 	private void startHeartBeat() {
 
 		// System.out.println("sending heartbeat");
-		beater.scheduleAtFixedRate(new Runnable() {
+		beaterPool.scheduleAtFixedRate(new Runnable() {
 			@Override
 			public void run() {
 				sendHeartbeat();

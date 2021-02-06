@@ -12,8 +12,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+
+import com.google.common.util.concurrent.MoreExecutors;
 
 import javaMiniSockets.messages.MessageInfoPair;
 import javaMiniSockets.serverSide.ServerCouldNotConnectException;
@@ -29,11 +32,13 @@ import javaMiniSockets.serverSide.ServerCouldNotConnectException;
 class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketChannel, ServerInfo> {
 
 	private String separator;
-	private ScheduledExecutorService fixedReader;
+	private ScheduledExecutorService fixedReaderPool;
+	private ExecutorService readerPoolPool;
 	private ExecutorService readerPool;
+	private ExecutorService fixedReader; 
 	private AsynchronousClient asyncClient;
 	private long delay_N = 33;
-	private int FixedReader_N = 6;
+	private int FixedReader_N = 1;
 	private int initialDelay_N = 0;
 	private int bufferSize_N = 8192;
 	@SuppressWarnings("unused")
@@ -48,12 +53,13 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 * @param messageHandler
 	 */
 	protected ClientConnectionHandler(AsynchronousClient asynchronousClient, ClientMessageHandler messageHandler2) {
-		readerPool = Executors.newFixedThreadPool(6);
+		readerPoolPool = Executors.newFixedThreadPool(1);
+		readerPool = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) readerPoolPool,100,TimeUnit.MILLISECONDS);
 		inputLock = new ReentrantLock();
 		asyncClient = asynchronousClient;
 		messageHandler = messageHandler2;
 		separator = "DONOTWRITETHIS";
-		fixedReader = Executors.newScheduledThreadPool(FixedReader_N);
+		fixedReaderPool = Executors.newScheduledThreadPool(FixedReader_N);
 
 	}
 
@@ -72,13 +78,14 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 
 		asyncClient.serverInfo = this.serverInfo;
 
-		fixedReader.scheduleAtFixedRate(new Runnable() {
+		fixedReaderPool.scheduleAtFixedRate(new Runnable() {
 			@Override
 			public void run() {
 				
 					readCheck();
 				
 			}
+
 
 			private void readCheck() {
 				try {
@@ -89,6 +96,8 @@ class ClientConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				
 			}
 		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
+		fixedReader = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) fixedReaderPool , 100 , TimeUnit.MILLISECONDS);
+
 
 		asyncClient.connectedFlag = true;
 

@@ -50,8 +50,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private int FixedReader_N = 1;
 	private int initialDelay_N = 0;
 	private int bufferSize_N =  8192;
-	private int surplus = 0;
-	private int ReaderPool_N;
+	private int ReaderPool_N =1;
 	private String separator = "DONOTWRITETHIS";
 	private ServerMessageHandler serverMessageHandler;
 	private boolean closed;
@@ -70,7 +69,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		serverMessageHandler = mHandler;
 		MaxConnections = max;
 		this.asyncServer = server;
-		ReaderPool_N = MaxConnections + surplus;
 
 		connected = new AtomicInteger();
 		clients = new ConcurrentHashMap<Integer, ClientInfo>();

@@ -15,10 +15,14 @@ import java.util.Enumeration;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import com.google.common.util.concurrent.MoreExecutors;
 
 //import com.dosse.upnp.UPnP;
 
@@ -44,14 +48,16 @@ public class AsynchronousServer {
 	private int port;
 //	private int clientport;
 	private ServerMessageHandler messageHandler;
-	private ThreadPoolExecutor queueReader;
+	private ThreadPoolExecutor queueReaderPool;
+	private ExecutorService queueReader; 
 	private int messageQueue_N;
 	private int maxClients;
 	private ServerConnectionHandler serverHandler;
 	private AsynchronousServerSocketChannel server = null;
 	private ArrayBlockingQueue<MessageInfoPair> messageQueue;
 	private MessageInfoPair lastReadMessage = null;
-	private ThreadPoolExecutor sendPool;
+	private ThreadPoolExecutor sendPoolPool;
+	private ExecutorService sendPool; 
 	private ByteArrayOutputStream serializeBAOS;
 	private ObjectOutputStream serializeOutput;
 	private Thread serverThread;
@@ -77,7 +83,9 @@ public class AsynchronousServer {
 		if (ownAddress != null) {
 			this.ownAddress = ownAddress;
 		}
-		sendPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
+		sendPoolPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
+		sendPool = MoreExecutors.getExitingExecutorService(sendPoolPool , 100 , TimeUnit.MILLISECONDS);
+		
 
 		this.messageQueue_N = messageQueueSize;
 		this.port = port;
@@ -330,7 +338,8 @@ public class AsynchronousServer {
 	private void run() {
 		startConnections();
 
-		queueReader = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
+		queueReaderPool = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
+		queueReader = MoreExecutors.getExitingExecutorService(queueReaderPool , 100 , TimeUnit.MILLISECONDS);
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
