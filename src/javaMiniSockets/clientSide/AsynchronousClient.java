@@ -119,7 +119,7 @@ this.separator = separator;
 		messageQueue = new ArrayBlockingQueue<MessageInfoPair>(100);
 		@SuppressWarnings("unused")
 		MessageInfoPair lastReadMessage;
-		executorPool = Executors.newSingleThreadExecutor();
+		executorPool = Executors.newFixedThreadPool(1);
 		executor = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) executorPool, 100 , TimeUnit.MILLISECONDS);
 		beaterPool = Executors.newScheduledThreadPool(executorthreads_N);
 		beater =  MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) beaterPool, 100, TimeUnit.MILLISECONDS);
@@ -185,7 +185,6 @@ this.separator = separator;
 		serializedMessage = clientBAOS.toString();
 		clientBAOS.flush();
 		clientBAOS.close();
-		// System.out.println("Sending bytes" + serializedMessage.getBytes().length);
 
 		executor.execute(() -> {
 			try {
@@ -436,15 +435,8 @@ this.separator = separator;
 	}
 
 	private void startHeartBeat() {
-
-		// System.out.println("sending heartbeat");
-		beaterPool.scheduleAtFixedRate(new Runnable() {
-			@Override
-			public void run() {
-				sendHeartbeat();
-			}
-
-		}, initialDelay, heartBeatDelay, TimeUnit.MILLISECONDS);
+		
+		beaterPool.scheduleAtFixedRate(()-> sendHeartbeat(), initialDelay, heartBeatDelay, TimeUnit.MILLISECONDS);
 
 	}
 

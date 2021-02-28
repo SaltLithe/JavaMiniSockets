@@ -118,7 +118,7 @@ public class AsynchronousServer {
 		if (serverThread.isAlive() && !serverThread.isInterrupted()) {
 			serverThread.interrupt();
 			serverHandler.closeAllConnections();
-
+			messageHandler.onDisconnect();
 		}
 	}
 
@@ -375,6 +375,7 @@ public class AsynchronousServer {
 					}
 				}
 			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
 				e.printStackTrace();
 			} catch (ExecutionException e) {
 				e.printStackTrace();
