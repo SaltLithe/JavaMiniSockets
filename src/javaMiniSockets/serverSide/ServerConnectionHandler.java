@@ -84,7 +84,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			}
 		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
 		
-		fixedReader = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) fixedReader, 100, TimeUnit.MILLISECONDS);
+		fixedReader = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) fixedReaderPool, 100, TimeUnit.MILLISECONDS);
 		readerPool = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) readerPoolPool, 100, TimeUnit.MILLISECONDS);
 
 

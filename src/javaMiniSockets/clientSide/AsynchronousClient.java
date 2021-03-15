@@ -478,6 +478,7 @@ this.separator = separator;
 			
 
 		} catch (Exception e) {
+			e.printStackTrace();
 		} finally {
 
 			clientLock.release(); 
