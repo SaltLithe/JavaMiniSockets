@@ -19,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.sun.org.apache.xml.internal.security.exceptions.Base64DecodingException;
+import com.sun.org.apache.xml.internal.security.utils.Base64;
 
 import javaMiniSockets.clientSide.ClientCouldNotConnectException;
 import javaMiniSockets.messages.MessageInfoPair;
@@ -36,6 +38,7 @@ import javaMiniSockets.messages.MessageInfoPair;
 
 class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketChannel, ClientInfo> {
 
+	public int checkSum = 0;
 	private ConcurrentHashMap<Integer, ClientInfo> clients;
 	private AtomicInteger ids;
 	private ScheduledExecutorService fixedReaderPool;
@@ -49,12 +52,10 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private long delay_N = 33;
 	private int FixedReader_N = 1;
 	private int initialDelay_N = 0;
-	private int bufferSize_N =  8192;
-	private int ReaderPool_N =1;
-	private String separator = "DONOTWRITETHIS";
+	private int bufferSize_N = 10240;
+	private int ReaderPool_N = 1;
 	private ServerMessageHandler serverMessageHandler;
 	private boolean closed;
-	ExecutorService fixedReader;
 	ExecutorService readerPool;
 
 	/**
@@ -65,6 +66,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 */
 	protected ServerConnectionHandler(AsynchronousServer server, int max, ServerMessageHandler mHandler) {
 
+		com.sun.org.apache.xml.internal.security.Init.init();
 		closed = false;
 		serverMessageHandler = mHandler;
 		MaxConnections = max;
@@ -77,16 +79,8 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		fixedReaderPool = Executors.newScheduledThreadPool(FixedReader_N);
 		readerPoolPool = Executors.newFixedThreadPool(ReaderPool_N);
 
-		fixedReaderPool.scheduleAtFixedRate(new Runnable() {
-			@Override
-			public void run() {
-				readloop();
-			}
-		}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
-		
-		fixedReader = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) fixedReaderPool, 100, TimeUnit.MILLISECONDS);
-		readerPool = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) readerPoolPool, 100, TimeUnit.MILLISECONDS);
-
+		readerPool = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) readerPoolPool, 100,
+				TimeUnit.MILLISECONDS);
 
 	}
 
@@ -105,7 +99,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		try {
 			addClient(client, attach);
 		} catch (MaximumConnectionsReachedException e) {
-		//	e.printStackTrace();
+			// e.printStackTrace();
 		}
 
 	}
@@ -138,7 +132,6 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				SocketAddress clientAddr = client.getRemoteAddress();
 				clientInfo.server.accept(clientInfo, this);
 				int clientID = ids.getAndIncrement();
-				
 
 				ClientInfo newClientInfo = new ClientInfo(clientInfo.server, client, ByteBuffer.allocate(bufferSize_N),
 						clientAddr, clientID);
@@ -153,6 +146,15 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				e.printStackTrace();
 
 			}
+			if (connected.get() == 1) {
+
+				fixedReaderPool.scheduleAtFixedRate(new Runnable() {
+					@Override
+					public void run() {
+						readloop();
+					}
+				}, initialDelay_N, delay_N, TimeUnit.MILLISECONDS);
+			}
 		} else {
 			throw new MaximumConnectionsReachedException("Maximum number of connections reached");
 
@@ -164,7 +166,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	 * 
 	 * @param clientInfo
 	 */
-	protected void disconnectClient(ClientInfo clientInfo , int ClientID) {
+	protected void disconnectClient(ClientInfo clientInfo, int ClientID) {
 		try {
 			clientInfo.clientInputLock.lock();
 			clientInfo.clientOutputLock.lock();
@@ -176,7 +178,7 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 		} catch (Exception e) {
 
 		} finally {
-	
+
 			serverMessageHandler.onClientDisconnect(ClientID);
 		}
 	}
@@ -184,11 +186,10 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 	private void readcheck(ClientInfo clientInfo) {
 
 		clientInfo.clientInputLock.lock();
-		
+		int bytesRead = -1;
 
 		try {
 
-			int bytesRead = -1;
 			// We access the client's buffer to see if there are bytes to read
 			try {
 
@@ -213,75 +214,61 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			// If there are bytes to read they are read and parsed to a string , this string
 			// is deserialized and sent to the
 			// message queue and the client's buffer is cleared so it can be read from again
-			if (bytesRead != -1) {
-				if (clientInfo.inputBuffer.position() > 2) {
-					clientInfo.inputBuffer.flip();
+			if (bytesRead >= 4) {
 
-					// Read
-					byte[] lineBytes = new byte[bytesRead];
-					clientInfo.inputBuffer.get(lineBytes, 0, bytesRead);
+				byte[] internal = clientInfo.inputBuffer.array();
+				byte[] expectedBytes = { internal[0], internal[1], internal[2], internal[3] };
+				ByteBuffer expectedBuffer = ByteBuffer.wrap(expectedBytes);
+				int expected = expectedBuffer.getInt();
+				if (expected <= bytesRead - 4) {
 
-					// Lines are separated by system line separator and processed individually
-					String fullLine = new String(lineBytes);
-					String[] lines = fullLine.split(separator);
-					clientInfo.inputBuffer.clear();
+					if (clientInfo.inputBuffer.position() > 2) {
 
-					// Deserialize
-					for (int i = 0; i < lines.length; i++) {
+						clientInfo.inputBuffer.flip();
 
-						String line = lines[i];
-						byte b[] = line.getBytes();
-						clientInfo.clientInputBAOS = new ByteArrayInputStream(b);
-						// System.out.println("Line is " + line);
+						int numberOfBytes = clientInfo.inputBuffer.getInt();
+						byte[] lineBytes = new byte[numberOfBytes];
+						clientInfo.inputBuffer.get(lineBytes, 0, numberOfBytes);
 
 						try {
+							ByteArrayInputStream InputBAOS = new ByteArrayInputStream(lineBytes);
+							ObjectInputStream clientInput = new ObjectInputStream(InputBAOS);
+							Serializable message = (Serializable) clientInput.readObject();
 
-							clientInfo.clientInput = new ObjectInputStream(clientInfo.clientInputBAOS);
+							InputBAOS.close();
+							InputBAOS.reset();
+							clientInput.close();
+							InputBAOS = null;
+							clientInput = null;
+							if (message != null) {
 
-						} catch (IOException e1) {
-							e1.printStackTrace();
-						}
-						Serializable message = null;
-
-						try {
-
-				
-								
-							message = (Serializable) clientInfo.clientInput.readObject();
-						
-							
-
-							clientInfo.clientInput.close();
-							clientInfo.clientInputBAOS.close();
-							clientInfo.clientInputBAOS.reset();
-							
-						
-						} catch (ClassNotFoundException | IOException e) {
+								MessageInfoPair pair = new MessageInfoPair(message, clientInfo);
+								// System.out.println("Message is : " + message);
+								asyncServer.sendMessageToReadingQueue(pair);
+								clientInfo.lastHeartBeatServerSide = 0;
+							}
+						} catch (ClassNotFoundException e) {
 							e.printStackTrace();
-						}
-						// Send to queue
-						if(message != null) {
-						MessageInfoPair pair = new MessageInfoPair(message, clientInfo);
+						} catch (IOException e) {
+							e.printStackTrace();
+						} finally {
+							clientInfo.lastHeartBeatServerSide = System.currentTimeMillis();
+							clientInfo.inputBuffer.compact();
 
-						asyncServer.sendMessageToReadingQueue(pair);
-						clientInfo.lastHeartBeatServerSide = 0;
 						}
 					}
-				}
-				clientInfo.lastHeartBeatServerSide = System.currentTimeMillis();
 
-			} else {
-				// System.out.println("no message could be found");
-				// System.out.println(System.currentTimeMillis() -
-				// clientInfo.lastHeartBeatServerSide);
-				if (System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide >= heartbeatminimumServerSide) {
-					disconnectClient(clientInfo , clientInfo.clientID);
+				} else {
+					
+					if (System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide >= heartbeatminimumServerSide) {
+						disconnectClient(clientInfo, clientInfo.clientID);
+					}
+					updateHeartBeat(clientInfo.clientID,
+							System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide);
 				}
-				updateHeartBeat(clientInfo.clientID, System.currentTimeMillis() - clientInfo.lastHeartBeatServerSide);
-
 			}
-
 		} finally {
+
 			clientInfo.clientInputLock.unlock();
 		}
 
@@ -304,9 +291,9 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 				}
 			}
 
-		}else {
-			fixedReader.shutdown();
-			readerPool.shutdown(); 
+		} else {
+			fixedReaderPool.shutdown();
+			readerPool.shutdown();
 		}
 	}
 
@@ -391,15 +378,14 @@ class ServerConnectionHandler implements CompletionHandler<AsynchronousSocketCha
 			clients.get(key).clientOutputLock.unlock();
 
 			disconnectClient(key);
-			
 
 		}
 
 		connected.set(0);
 	}
-	
-	protected void  close() {
-		closed = true; 
+
+	protected void close() {
+		closed = true;
 	}
 
 	public void openBackwardsConnection(int clientID, String clientIP, int clientPort) {

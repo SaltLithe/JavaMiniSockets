@@ -24,6 +24,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+
 import com.google.common.util.concurrent.MoreExecutors;
 
 //import com.dosse.upnp.UPnP;
@@ -46,6 +47,7 @@ import javaMiniSockets.messages.MessageInfoPair;
 
 public class AsynchronousClient {
 
+	public int checksum = 0;
 	private String address;
 	private int port;
 	private SocketChannel serverSocket;
@@ -59,13 +61,13 @@ public class AsynchronousClient {
 	private ByteArrayOutputStream heartBAOS;
 	private ByteBuffer outputbuffer;
 	private ThreadPoolExecutor queueReaderPool;
-	private ExecutorService queueReader; 
+	private ExecutorService queueReader;
 	private ClientMessageHandler messageHandler;
 	private String ownAddress;
 	private ExecutorService executor;
 	private ExecutorService executorPool;
 	private ScheduledExecutorService beaterPool;
-	private ExecutorService beater; 
+	private ExecutorService beater;
 	private int executorthreads_N = 1;
 	private Semaphore clientLock;
 	private MessageInfoPair lastReadMessage;
@@ -74,12 +76,11 @@ public class AsynchronousClient {
 	private long initialDelay = 0;
 	public int heartcount = 0;
 	public int serverPort;
-	private int clientport; 
+	private int clientport;
 	private long connectionDelay = 15000;
 	boolean connectedFlag = false;
-	private String separator; 
 	private Semaphore notifySem;
-	
+
 	/**
 	 * How often a heartbeat message is sent in milliseconds.
 	 */
@@ -102,14 +103,23 @@ public class AsynchronousClient {
 	 * @param clientPort    : Port this client will be bound to for receiving server
 	 *                      messages. Any dynamic port up to 65,536.
 	 */
-	public AsynchronousClient(String serverAddress, String ownAddress, int serverPort, 
-			ClientMessageHandler handler,String separator) {
+	public AsynchronousClient(String serverAddress, String ownAddress, int serverPort, ClientMessageHandler handler,
+			String separator) {
+		
+
 		notifySem = new Semaphore(1);
-this.separator = separator; 
+	
 		if (ownAddress != null) {
 
 			this.ownAddress = ownAddress;
 		}
+		clientBAOS = new ByteArrayOutputStream();
+		try {
+			clientOutput = new ObjectOutputStream(clientBAOS);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 		this.serverPort = serverPort;
 		messageHandler = handler;
 		this.port = serverPort;
@@ -120,9 +130,10 @@ this.separator = separator;
 		@SuppressWarnings("unused")
 		MessageInfoPair lastReadMessage;
 		executorPool = Executors.newFixedThreadPool(1);
-		executor = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) executorPool, 100 , TimeUnit.MILLISECONDS);
+		executor = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) executorPool, 100,
+				TimeUnit.MILLISECONDS);
 		beaterPool = Executors.newScheduledThreadPool(executorthreads_N);
-		beater =  MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) beaterPool, 100, TimeUnit.MILLISECONDS);
+		beater = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) beaterPool, 100, TimeUnit.MILLISECONDS);
 
 		clientLock = new Semaphore(1);
 		lastTimestamp = System.currentTimeMillis();
@@ -158,11 +169,11 @@ this.separator = separator;
 	 * @throws IOException
 	 */
 	public void disconnect() throws NotConnectedYetException, IOException {
-		
-			stopHeartBeat();
-			serverSocket.close();
-			messageHandler.onDisconnect();
-			connectedFlag = false;
+
+		stopHeartBeat();
+		serverSocket.close();
+		messageHandler.onDisconnect();
+		connectedFlag = false;
 	}
 
 	/**
@@ -174,17 +185,18 @@ this.separator = separator;
 	 */
 	public void send(Serializable message) throws IOException {
 
-		String serializedMessage;
+		byte[] serializedMessage;
 		CommonInternalMessage outMessage = new CommonInternalMessage(message, calculateTimestamp());
 
 		clientBAOS = new ByteArrayOutputStream();
 		clientOutput = new ObjectOutputStream(clientBAOS);
 		clientOutput.writeObject(outMessage);
+
+		clientOutput.flush();
+		serializedMessage = clientBAOS.toByteArray();
+		clientBAOS.close();
 		clientOutput.flush();
 		clientOutput.close();
-		serializedMessage = clientBAOS.toString();
-		clientBAOS.flush();
-		clientBAOS.close();
 
 		executor.execute(() -> {
 			try {
@@ -195,7 +207,6 @@ this.separator = separator;
 		});
 
 	}
-
 
 	/**
 	 * Calculates difference between the last time the client has sent a message ,
@@ -221,7 +232,7 @@ this.separator = separator;
 	}
 
 	public void setAutomaticIP() {
-	//	ownAddress = UPnP.getLocalIP();
+		// ownAddress = UPnP.getLocalIP();
 		ownAddress = "192.168.1.73";
 	}
 
@@ -247,20 +258,18 @@ this.separator = separator;
 
 		return addresses;
 	}
-	
-	
-	private void openOnRandom () {
-		
+
+	private void openOnRandom() {
+
 		try {
-			
+
 			client = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, 0));
-			clientport = ((InetSocketAddress) client.getLocalAddress()).getPort(); 
+			clientport = ((InetSocketAddress) client.getLocalAddress()).getPort();
 
 		} catch (IOException e) {
-			
-			
+
 			e.printStackTrace();
-			
+
 		}
 	}
 
@@ -281,32 +290,28 @@ this.separator = separator;
 	}
 
 	private void connectionTimeout() {
-		
-	
-			
+
+		try {
+			Thread.sleep(connectionDelay);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		if (!connectedFlag) {
+
 			try {
-				Thread.sleep(connectionDelay);
-			} catch (InterruptedException e) {
+
+				disconnect();
+			} catch (NotConnectedYetException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
 				e.printStackTrace();
 			}
-			
-			
-				if (!connectedFlag) {
 
-					try {
+		}
 
-						disconnect();
-					} catch (NotConnectedYetException e) {
-						e.printStackTrace();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					
-				}
-			
-		
-		
 	}
+
 	/**
 	 * Conects the client to the server.
 	 * 
@@ -316,21 +321,18 @@ this.separator = separator;
 	private void connect() throws IOException {
 
 		try {
-		   new Thread(()-> connectionTimeout()).start();
+			// new Thread(() -> connectionTimeout()).start();
 			serverSocket = SocketChannel.open(new InetSocketAddress(address, port));
-			
-			
+
 			sendAddressInfo();
 			startHeartBeat();
-			
-			
 
 			messageHandler.onConnect();
 		} catch (IOException e) {
-			messageHandler.onConnectFail(); 
+			messageHandler.onConnectFail();
 			serverSocket = null;
 		}
-		
+
 	}
 
 	/**
@@ -342,7 +344,7 @@ this.separator = separator;
 	private void run() throws IOException {
 
 		queueReaderPool = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
-		queueReader = MoreExecutors.getExitingExecutorService(queueReaderPool , 100 , TimeUnit.MILLISECONDS);
+		queueReader = MoreExecutors.getExitingExecutorService(queueReaderPool, 100, TimeUnit.MILLISECONDS);
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
@@ -358,8 +360,7 @@ this.separator = separator;
 				e.printStackTrace();
 			} catch (ExecutionException e) {
 				e.printStackTrace();
-			}
-			finally {
+			} finally {
 				notifySem.release();
 			}
 		}
@@ -368,24 +369,24 @@ this.separator = separator;
 	private void sendAddressInfo() {
 
 		try {
-			String serializedMessage;
-			HandShakeInternalMessage outMessage = new HandShakeInternalMessage(ownAddress , clientport); 
-		
+			byte[] serializedMessage;
+			HandShakeInternalMessage outMessage = new HandShakeInternalMessage(ownAddress, clientport);
+
 			clientBAOS = new ByteArrayOutputStream();
 			clientOutput = new ObjectOutputStream(clientBAOS);
 			clientOutput.writeObject(outMessage);
 			clientOutput.flush();
 			clientOutput.close();
-			serializedMessage = clientBAOS.toString();
+			serializedMessage = clientBAOS.toByteArray();
 			clientBAOS.flush();
 			clientBAOS.close();
 			sendRoutine(serializedMessage);
 
 		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		
+
 	}
-	
 
 	/**
 	 * Continously sends a heartbeat message to the server to indicate that it is
@@ -394,9 +395,7 @@ this.separator = separator;
 
 	private void sendHeartbeat() {
 		CommonInternalMessage heartbeat = new CommonInternalMessage(null, calculateTimestamp());
-
 		String serializedMessage = null;
-
 
 		try {
 			clientLock.acquire();
@@ -405,17 +404,22 @@ this.separator = separator;
 			heartOutput = new ObjectOutputStream(heartBAOS);
 
 			heartOutput.writeObject(heartbeat);
+
 			serializedMessage = heartBAOS.toString();
 
-			serializedMessage += separator;
+			// serializedMessage += separator;
 
-			outputbuffer.put(serializedMessage.getBytes());
+			byte[] sizeof = serializedMessage.getBytes();
+			outputbuffer = ByteBuffer.allocate(sizeof.length + 4);
+			outputbuffer.clear();
+			outputbuffer.putInt(sizeof.length);
+			outputbuffer.put(sizeof);
 			outputbuffer.flip();
-			serverSocket.write(outputbuffer);
-
+			while (outputbuffer.hasRemaining()) {
+				serverSocket.write(outputbuffer);
+			}
 			heartBAOS.close();
 			heartOutput.close();
-			Thread.sleep(50);
 
 		} catch (Exception e) {
 			try {
@@ -424,19 +428,19 @@ this.separator = separator;
 				e1.printStackTrace();
 			} catch (IOException e1) {
 				e1.printStackTrace();
-			} 
+			}
 			// System.out.println("Error writing heartbeat message");
 			e.printStackTrace();
 		} finally {
 			outputbuffer.clear();
-			clientLock.release(); 
+			clientLock.release();
 		}
 
 	}
 
 	private void startHeartBeat() {
-		
-		beaterPool.scheduleAtFixedRate(()-> sendHeartbeat(), initialDelay, heartBeatDelay, TimeUnit.MILLISECONDS);
+
+		beaterPool.scheduleAtFixedRate(() -> sendHeartbeat(), initialDelay, heartBeatDelay, TimeUnit.MILLISECONDS);
 
 	}
 
@@ -458,7 +462,7 @@ this.separator = separator;
 	 * @param serializedMessage
 	 * @throws IOException
 	 */
-	private void sendRoutine(String serializedMessage) throws IOException {
+	private void sendRoutine(byte[] serializedMessage) throws IOException {
 
 		try {
 			clientLock.acquire();
@@ -466,22 +470,32 @@ this.separator = separator;
 			e1.printStackTrace();
 		}
 		try {
-			serializedMessage += separator;
+			// serializedMessage += separator;
 
 			
-			outputbuffer.put(serializedMessage.getBytes());
-			outputbuffer.flip();
-			serverSocket.write(outputbuffer);
-
+			outputbuffer = ByteBuffer.allocate(serializedMessage.length + 4);
 			outputbuffer.clear();
-			Thread.sleep(50);
+
+			outputbuffer.putInt(serializedMessage.length);
+			outputbuffer.put(serializedMessage);
+			outputbuffer.flip();
+			int written = 0;
+			while (outputbuffer.hasRemaining()) {
+				written += serverSocket.write(outputbuffer);
+			}
+			if (written != (serializedMessage.length + 4)) {
+				System.out.println("Written : " + written + " out of " + (serializedMessage.length + 4));
+			}
 			
+			outputbuffer.clear();
+
+
+			Thread.sleep(100);
 
 		} catch (Exception e) {
-			e.printStackTrace();
 		} finally {
 
-			clientLock.release(); 
+			clientLock.release();
 		}
 
 	}
@@ -497,7 +511,7 @@ this.separator = separator;
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
 				CommonInternalMessage incomingMessage = (CommonInternalMessage) resultado.get().getMessage();
-				// If the message is null it is considered a teartbeat from the client
+				// If the message is null it is considered a heartbeat from the client
 				if (incomingMessage.getMessage() != null) {
 					messageHandler.onMessageSent(incomingMessage.getMessage(), serverInfo);
 				}

@@ -48,8 +48,7 @@ public class AsynchronousServer {
 	private int port;
 //	private int clientport;
 	private ServerMessageHandler messageHandler;
-	private ThreadPoolExecutor queueReaderPool;
-	private ExecutorService queueReader; 
+	private ThreadPoolExecutor queueReader;
 	private int messageQueue_N;
 	private int maxClients;
 	private ServerConnectionHandler serverHandler;
@@ -57,12 +56,11 @@ public class AsynchronousServer {
 	private ArrayBlockingQueue<MessageInfoPair> messageQueue;
 	private MessageInfoPair lastReadMessage = null;
 	private ThreadPoolExecutor sendPoolPool;
-	private ExecutorService sendPool; 
+	private ExecutorService sendPool;
 	private ByteArrayOutputStream serializeBAOS;
 	private ObjectOutputStream serializeOutput;
 	private Thread serverThread;
 	private String ownAddress;
-	private String separator;
 	private Semaphore notifySem;
 	private Semaphore broadCastSem;
 
@@ -77,15 +75,15 @@ public class AsynchronousServer {
 
 	public AsynchronousServer(String serverName, ServerMessageHandler messageHandler, int maxClients, int port,
 			String ownAddress, int messageQueueSize, String separator) {
+		System.out.println("Update server");
+
 		broadCastSem = new Semaphore(1);
 		notifySem = new Semaphore(1);
-		this.separator = separator; 
 		if (ownAddress != null) {
 			this.ownAddress = ownAddress;
 		}
 		sendPoolPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
-		sendPool = MoreExecutors.getExitingExecutorService(sendPoolPool , 100 , TimeUnit.MILLISECONDS);
-		
+		sendPool = MoreExecutors.getExitingExecutorService(sendPoolPool, 100, TimeUnit.MILLISECONDS);
 
 		this.messageQueue_N = messageQueueSize;
 		this.port = port;
@@ -101,25 +99,34 @@ public class AsynchronousServer {
 	/**
 	 * Starts the server in it's own thread
 	 */
-	public void Start() {
+	public boolean Start() {
 
+		boolean success = startConnections();
+
+		if(success) {
 		serverThread = new Thread(() -> run());
 		// serverThread.setName(serverName);
 		serverThread.start();
 
 		messageHandler.onReady();
-
+		}
+		return success;
 	}
 
 	/**
 	 * Stops the server from reading from the clients and closes it's connection.
 	 */
 	public void Stop() {
+	try {
 		if (serverThread.isAlive() && !serverThread.isInterrupted()) {
 			serverThread.interrupt();
 			serverHandler.closeAllConnections();
 			messageHandler.onDisconnect();
 		}
+	}
+	catch(Exception e) {
+		e.printStackTrace();
+	}
 	}
 
 	/**
@@ -137,8 +144,7 @@ public class AsynchronousServer {
 		return allclients;
 
 	}
-	
-	
+
 	public void close() {
 		serverHandler.close();
 	}
@@ -156,21 +162,21 @@ public class AsynchronousServer {
 		try {
 			// sendLock.lock();
 			ConcurrentHashMap<Integer, ClientInfo> clientes = serverHandler.getSelectedClients(clientIDS);
-			String[] serializedMessages = new String[messages.length];
+			ArrayList<byte[]> serializedMessages = new ArrayList<byte[]>(messages.length);
 
 			for (int i = 0; i < messages.length; i++) {
 
 				serializeBAOS = new ByteArrayOutputStream();
 				serializeOutput = new ObjectOutputStream(serializeBAOS);
-				String serializedMessage;
+				byte[] serializedMessage;
 				CommonInternalMessage outMessage = new CommonInternalMessage(messages[i], 0);
 
 				serializeOutput.writeObject(outMessage);
 				serializeOutput.flush();
 				serializeOutput.close();
-				serializedMessage = serializeBAOS.toString();
+				serializedMessage = serializeBAOS.toByteArray();
 				serializeBAOS.close();
-				serializedMessages[i] = serializedMessage;
+				serializedMessages.add(serializedMessage);
 			}
 
 			for (ClientInfo client : clientes.values()) {
@@ -200,11 +206,11 @@ public class AsynchronousServer {
 		try {
 			if (serverHandler != null) {
 				ConcurrentHashMap<Integer, ClientInfo> clientes = serverHandler.getAllClients();
-				String[] serializedMessages = new String[messages.length];
+				ArrayList<byte[]> serializedMessages = new ArrayList<byte[]>(messages.length);
 
 				for (int i = 0; i < messages.length; i++) {
 
-					String serializedMessage;
+					byte[] serializedMessage;
 					CommonInternalMessage outMessage = new CommonInternalMessage(messages[i], 0);
 
 					serializeBAOS = new ByteArrayOutputStream();
@@ -212,9 +218,9 @@ public class AsynchronousServer {
 					serializeOutput.writeObject(outMessage);
 					serializeOutput.flush();
 					serializeOutput.close();
-					serializedMessage = serializeBAOS.toString();
+					serializedMessage = serializeBAOS.toByteArray();
 					serializeBAOS.close();
-					serializedMessages[i] = serializedMessage;
+					serializedMessages.add(serializedMessage);
 				}
 
 				for (ClientInfo client : clientes.values()) {
@@ -243,28 +249,31 @@ public class AsynchronousServer {
 	 * @param serializedMessages
 	 * @throws IOException
 	 */
-	private void sendRoutine(ClientInfo client, String[] serializedMessages) throws IOException {
+	private void sendRoutine(ClientInfo client, ArrayList<byte[]> serializedMessages) throws IOException {
 		try {
 			broadCastSem.acquire();
 			client.clientOutputLock.lock();
 
+			for (byte[] message : serializedMessages) {
 
-			for (String message : serializedMessages) {
-				message += separator;
-				client.inputBuffer.put(message.getBytes());
+				client.inputBuffer.putInt(message.length);
+				client.inputBuffer.put(message);
 				client.inputBuffer.flip();
-				client.clientOut.write(client.inputBuffer);
+				int written = 0;
+				while (client.inputBuffer.hasRemaining()) {
+					written += client.clientOut.write(client.inputBuffer);
+				}
+				if (written != (message.length + 4)) {
+					System.out.println("Written : " + written + "out of " + (message.length + 4));
+				}
 				client.inputBuffer.clear();
 				Thread.sleep(50);
-
-
 			}
 
 		} catch (Exception e) {
 		} finally {
 			client.clientOutputLock.unlock();
 			broadCastSem.release();
-
 
 		}
 
@@ -313,20 +322,24 @@ public class AsynchronousServer {
 	 * messages from the clients and sending them to the message qeue.
 	 * 
 	 */
-	private void startConnections() {
+	private boolean startConnections() {
 		try {
 
 			// System.out.println(ownAddress);
 			server = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(ownAddress, port));
 
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+			ClientInfo clientInfo = new ClientInfo();
+			clientInfo.server = server;
+			serverHandler = new ServerConnectionHandler(this, maxClients, messageHandler);
+			server.accept(clientInfo, serverHandler);
+			return true;
 
-		ClientInfo clientInfo = new ClientInfo();
-		clientInfo.server = server;
-		serverHandler = new ServerConnectionHandler(this, maxClients, messageHandler);
-		server.accept(clientInfo, serverHandler);
+		} catch (IOException e) {
+			this.messageHandler.onServerConnectionProblem();
+			e.printStackTrace();
+			return false;
+
+		}
 
 	}
 
@@ -335,16 +348,14 @@ public class AsynchronousServer {
 	 * message is read in a single thread for the user to manage.
 	 */
 
+	
 	private void run() {
-		startConnections();
 
-		queueReaderPool = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
-		queueReader = MoreExecutors.getExitingExecutorService(queueReaderPool , 100 , TimeUnit.MILLISECONDS);
+		queueReader = (ThreadPoolExecutor) Executors.newScheduledThreadPool(1);
 		while (true) {
 			Future<MessageInfoPair> resultado = queueReader.submit(() -> readfromqueue());
 			try {
 
-				
 				try {
 					CommonInternalMessage incomingMessage = (CommonInternalMessage) resultado.get().getMessage();
 					// If the message is null it is considered a teartbeat from the client
@@ -352,7 +363,7 @@ public class AsynchronousServer {
 						if (incomingMessage.getMessage() != null) {
 							notifySem.acquire();
 							messageHandler.onMessageSent(incomingMessage.getMessage(), resultado.get().getClient());
-							
+
 						}
 						serverHandler.updateHeartBeat(resultado.get().getClient().clientID,
 								incomingMessage.getTimestamp());
@@ -375,15 +386,16 @@ public class AsynchronousServer {
 					}
 				}
 			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+				queueReader.shutdown();
+
 				e.printStackTrace();
 			} catch (ExecutionException e) {
 				e.printStackTrace();
-			}
-			finally {
+			} finally {
 				notifySem.release();
 			}
 		}
+
 	}
 
 	/**
@@ -393,12 +405,10 @@ public class AsynchronousServer {
 	 */
 	private MessageInfoPair readfromqueue() {
 		try {
-			lastReadMessage = messageQueue.take();
 
+			lastReadMessage = messageQueue.take();
 		} catch (Exception e) {
 
-		
-		
 		}
 		return lastReadMessage;
 

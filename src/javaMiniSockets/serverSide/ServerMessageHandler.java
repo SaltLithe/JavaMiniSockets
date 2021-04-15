@@ -40,4 +40,6 @@ public interface ServerMessageHandler {
 	 */
 	public void onClientDisconnect(int clientID);
 
+	public void onServerConnectionProblem();
+	
 }
